@@ -147,6 +147,10 @@ Full roster: `src/config.js`.
 
 ## Demo
 
+Live demo: [https://mad5.de/murmur-vanilla-js/demo/](https://mad5.de/murmur-vanilla-js/demo/)
+
+Or run it locally:
+
 ```bash
 npm run build          # rebuild dist/murmur.js
 # then open demo/index.html in a browser
