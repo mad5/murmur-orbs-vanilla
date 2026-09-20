@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>repro</title>
+</head>
+<body>
+<script>
+window.__err = [];
+window.__lost = [];
+(function () {
+  var origErr = console.error;
+  console.error = function () {
+    var msg = Array.prototype.slice.call(arguments).join(" ");
+    window.__err.push(msg);
+    origErr.apply(console, arguments);
+  };
+})();
+window.addEventListener("error", function (e) { window.__err.push("page: " + e.message); });
+window.addEventListener("webglcontextlost", function (e) {
+  window.__lost.push("context lost on " + e.target.tagName);
+  e.preventDefault();
+});
+window.addEventListener("webglcontextrestored", function () {
+  window.__lost.push("context restored");
+});
+</script>
+<script src="../dist/murmur.js"></script>
+<pre id="report">
+<script>
+(function () {
+  "use strict";
+  // Small roster to reproduce at scale, all families rep'd.
+  var STYLES = ["eddy", "bloom", "caustic", "murmuration", "vortex", "halo", "aura", "opal", "comet",
+                "helix", "chorus", "duet", "glimmer", "echo", "ripple", "helix", "sol", "abyss"];
+  var pre = document.getElementById("report");
+  var lines = [];
+  var failures = {};
+  var ctxCreates = 0, ctxNulls = 0;
+  var origGet = CanvasRenderingContext2D ? null : null;
+
+  function runBatch(label) {
+    STYLES.forEach(function (s) {
+      var el = document.createElement("div");
+      el.style.cssText = "width:64px;height:64px;";
+      document.body.appendChild(el);
+      var m;
+      try { m = new Murmur(el, { style: s, animated: false }); }
+      catch (e) { lines.push(label + " " + s + " construct threw: " + e.message); return; }
+      m.renderStill(2.0);
+    });
+  }
+
+  runBatch("A");
+
+  var shaderLines = window.__err.filter(function (m) { return /shader failed|program link/i.test(m); });
+  var other = window.__err.filter(function (m) { return !/shader failed|program link/i.test(m); });
+
+  shaderLines.forEach(function (m) { lines.push("SHADER " + m.slice(0, 200)); });
+  lines.push("other console errors: " + other.length);
+  other.forEach(function (m) { lines.push("  ERR " + m.slice(0, 200)); });
+  lines.push("context lost events: " + window.__lost.length);
+  window.__lost.forEach(function (m) { lines.push("  LOST " + m); });
+  lines.push("webgl2 supported: " + (typeof WebGL2RenderingContext !== "undefined"));
+  pre.textContent = lines.join("\n");
+  document.title = "shaderErr=" + shaderLines.length + " lost=" + window.__lost.length;
+})();
+</script>
+</body>
+</html>

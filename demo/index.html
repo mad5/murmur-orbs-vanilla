@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Murmur orbs — vanilla JS demo</title>
+<style>
+  * { box-sizing: border-box; }
+  :root {
+    --bg: #08080b;
+    --panel: #121218;
+    --panel2: #1a1a22;
+    --ink: #e9e7f2;
+    --muted: #9b97ad;
+    --acc: #8b7cf5;
+    --line: #26262f;
+  }
+  html, body { margin: 0; }
+  body {
+    background:
+      radial-gradient(1200px 600px at 70% -10%, #17142a 0%, transparent 60%),
+      var(--bg);
+    color: var(--ink);
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+  header { padding: 28px 24px 6px; max-width: 1280px; margin: 0 auto; }
+  header h1 { margin: 0; font-size: 20px; letter-spacing: 0.2px; }
+  header p { margin: 4px 0 0; color: var(--muted); }
+  header code { color: var(--acc); }
+
+  main { max-width: 1280px; margin: 0 auto; padding: 20px 24px 80px; }
+  section { margin-top: 40px; }
+  h2 { font-size: 15px; margin: 12px 0; color: var(--muted); font-weight: 600; }
+
+  .hero { display: grid; grid-template-columns: minmax(260px, 300px) 1fr; gap: 24px; align-items: start; }
+  #stage { width: 280px; height: 280px; box-shadow: 0 0 0 1px var(--line), 0 18px 60px rgba(0,0,0,.55); border-radius: 50%; }
+  .controls {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 16px 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px 18px;
+  }
+  .controls .full { grid-column: 1 / -1; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  select, input[type=number] {
+    background: var(--panel2); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 8px; padding: 6px 8px; font: inherit;
+  }
+  input[type=range] { accent-color: var(--acc); }
+  input[type=color] {
+    width: 100%; height: 34px; padding: 2px; border: 1px solid var(--line);
+    border-radius: 8px; background: var(--panel2); cursor: pointer;
+  }
+  .badge {
+    font-size: 11px; color: var(--muted); border: 1px solid var(--line);
+    border-radius: 999px; padding: 4px 12px; white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  button, .btn {
+    background: var(--panel2); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 8px; padding: 6px 12px; font: inherit; cursor: pointer; transition: border-color .15s;
+  }
+  button:hover { border-color: var(--acc); background: #20202b; }
+  .states button { min-width: 92px; }
+  .knobs { grid-column: 1 / -1; display: grid; gap: 8px; }
+  .knob { display: grid; grid-template-columns: 90px 1fr 44px; align-items: center; gap: 8px; }
+  .knob .name { font-size: 12px; color: var(--muted); }
+  .knob output { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .hint { font-size: 12px; color: var(--muted); grid-column: 1 / -1; }
+
+  .roster-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 18px 12px; }
+  .tile { text-align: center; }
+  .tile .orb { width: 92px; height: 92px; margin: 0 auto; }
+  .tile .name { font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .family { margin-top: 26px; }
+  .family h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 10px; }
+
+  .demo-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  .card .row { margin-top: 12px; }
+  #static-stage { width: 120px; height: 120px; margin: 0 auto; border-radius: 50%; box-shadow: 0 0 0 1px var(--line); }
+
+  footer { color: var(--muted); font-size: 12px; }
+  footer a { color: var(--acc); }
+  footer code { color: var(--acc); background: var(--panel); padding: 1px 6px; border-radius: 6px; }
+  pre {
+    background: #0d0d12; border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 14px; overflow-x: auto; color: #cfc9e6;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Murmur — AI presence orbs</h1>
+  <p>Vanilla JS port, no build step. One <code>&lt;script src="dist/murmur.js"&gt;&lt;/script&gt;</code>
+  tag (WebGL2, Canvas2D fallback). Drive the hero orb from the console: <code>window.orb</code>.</p>
+</header>
+
+<main>
+  <section>
+    <h2>Driving instance — <code>new Murmur(el, config)</code></h2>
+    <div class="hero">
+      <div id="stage"></div>
+
+      <div class="controls">
+        <div class="field full">
+          <label for="backend">Backend — renderer</label>
+          <div class="row">
+            <select id="backend" style="flex:1">
+              <option value="auto">auto — best available (WebGL2, budget-aware)</option>
+              <option value="webgl2">webgl2 — force WebGL2</option>
+              <option value="canvas2d">canvas2d — force CPU fallback</option>
+            </select>
+            <span id="backendBadge" class="badge">…</span>
+          </div>
+        </div>
+        <div class="field">
+          <label for="family">Family</label>
+          <select id="family"></select>
+        </div>
+        <div class="field">
+          <label for="styleSel">Style</label>
+          <select id="styleSel"></select>
+        </div>
+
+        <div class="field full">
+          <label>State (<code>setState</code>, per-state entries &amp; character)</label>
+          <div class="row states" id="stateBtns"></div>
+        </div>
+
+        <div class="field">
+          <label for="level">level — voice <output id="levelOut">0.40</output></label>
+          <input id="level" type="range" min="0" max="1" step="0.01" value="0.4">
+        </div>
+        <div class="field">
+          <label for="activity">activity — cadence <output id="activityOut">0.30</output></label>
+          <input id="activity" type="range" min="0" max="1" step="0.01" value="0.3">
+        </div>
+        <div class="field">
+          <label for="tiltX">tilt x (glass parallax) <output id="tiltXOut">0.00</output></label>
+          <input id="tiltX" type="range" min="-1" max="1" step="0.01" value="0">
+        </div>
+        <div class="field">
+          <label for="tiltY">tilt y <output id="tiltYOut">0.00</output></label>
+          <input id="tiltY" type="range" min="-1" max="1" step="0.01" value="0">
+        </div>
+
+        <div class="field">
+          <label for="ink">ink — ground</label>
+          <input id="ink" type="color" value="#0a0a0f">
+        </div>
+        <div class="field">
+          <label for="tone">tone — hue</label>
+          <input id="tone" type="color" value="#6c5ce7">
+        </div>
+        <div class="field">
+          <label for="tone2">tone2 — glass duotone (glass only)</label>
+          <input id="tone2" type="color" value="#ffd93d">
+        </div>
+        <div class="field">
+          <label for="backgroundColor">canvas fill (constructor only)</label>
+          <input id="backgroundColor" type="color" value="#000000">
+          <span class="hint">Black uses <code>ink</code> as the fill; any other color becomes the backdrop.</span>
+        </div>
+
+        <div class="knobs" id="knobs"></div>
+
+        <div class="field">
+          <label for="fps">fps</label>
+          <input id="fps" type="number" min="1" max="60" step="1" value="30">
+        </div>
+        <div class="field">
+          <label><input id="animated" type="checkbox" checked> animated</label>
+          <span class="hint">Uncheck to render only on <code>renderStill(time)</code>.</span>
+        </div>
+
+        <div class="field full row">
+          <button id="recreate">Recreate (destroy + new)</button>
+          <button id="cycle">Cycle states</button>
+          <button id="mic">Use microphone</button>
+          <button id="still">Still frame</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Custom element — <code>&lt;murmur-orb&gt;</code> with plain attributes</h2>
+    <p class="hint" style="margin:0 0 14px">
+      Reads <code>style-name</code>, <code>state</code>, <code>level</code>, <code>activity</code>,
+      <code>tilt-x</code>, <code>tilt-y</code>, <code>signals</code> (JSON) and <code>config</code> (JSON).
+      Attribute changes live-update.
+    </p>
+    <div class="demo-cards">
+      <div class="card">
+        <div class="row" style="justify-content:center">
+          <span class="tile"><span class="orb"><murmur-orb style-name="aura" state="thinking" level="0.5" activity="0.6"></murmur-orb></span></span>
+          <span class="tile"><span class="orb"><murmur-orb style-name="nucleus" state="listening" level="0.9" activity="0"></murmur-orb></span></span>
+          <span class="tile"><span class="orb"><murmur-orb style-name="vortex" state="responding" level="0.3" activity="0.9"></murmur-orb></span></span>
+        </div>
+        <p style="color:var(--muted);font-size:12px;margin-bottom:0">Attributes bound declaratively in markup.</p>
+      </div>
+      <div class="card">
+        <div style="display:flex;justify-content:center;min-height:104px">
+          <span class="tile"><span class="orb"><murmur-orb id="attrOrb" style-name="arc" state="success"></murmur-orb></span></span>
+        </div>
+        <div class="row">
+          <button id="attrsCycle">Cycle state &amp; signals</button>
+          <span style="font-size:12px;color:var(--muted)">Drives the <code>state</code>, <code>level</code>, <code>activity</code> attributes.</span>
+        </div>
+      </div>
+      <div class="card">
+        <div style="display:flex;justify-content:center;min-height:104px">
+          <span class="tile"><span class="orb"><murmur-orb id="cfgOrb" style-name="nebula" tilt-x="0.25" tilt-y="-0.2" config='{"tone2":"#7efae9","states":{"thinking":{"character":{"c0":0.7,"c1":0.4,"c2":0.25,"c3":0.8}}}}'></murmur-orb></span></span>
+        </div>
+        <p style="color:var(--muted);font-size:12px;margin-bottom:0">
+          <code>config</code> JSON carries <code>tone2</code>, tilt and per-state
+          <code>character</code> overrides.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Static frame — <code>animated:false</code> + <code>renderStill(time)</code></h2>
+    <div class="card" style="max-width:400px">
+      <div id="static-stage"></div>
+      <div class="row">
+        <button id="staticPrev">t − 5s</button>
+        <button id="staticNext">t + 5s</button>
+        <span id="staticTime" style="color:var(--muted);font-size:12px">t = 0.00s</span>
+      </div>
+      <p style="color:var(--muted);font-size:12px;margin-bottom:0">
+        A non-animated orb renders exactly one deterministic frame for the requested shader clock.
+        Try it in a WebGL2 browser; without WebGL2 the Canvas2D fallback renders its own frame.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Full roster — all 66 styles, seven families</h2>
+    <div id="roster"></div>
+  </section>
+
+  <section>
+    <h2>Snippets</h2>
+    <pre><code>new Murmur(el, { style: "aura", tone: "#6c5ce7", state: "thinking" })
+  .setSignals({ level: 0.6, activity: 0.4 });      // live voice + cadence
+  .setTilt(0.2, -0.1);                              // glass parallax
+  .setState("success");                             // entry: swell
+  .setConfig({ style: "gather", ink: "#0a0a0f" });  // swap style, keep dials
+  .renderStill(4.0);                                // one deterministic frame
+  .destroy();</code></pre>
+  </section>
+
+  <footer>
+    murmur-vanilla-js v<span id="version"></span> · MIT · port of the
+    <a href="https://github.com/krispuckett/murmur">Swift Murmur package</a>
+  </footer>
+</main>
+
+<script src="../dist/murmur.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var ROSTER = {
+    liquid:   ["eddy", "well", "tide", "undertow", "meander", "confluence", "melt", "glaze"],
+    ink:      ["bloom", "marbling", "wick", "strata", "halation", "pool", "feather", "palimpsest"],
+    light:    ["caustic", "aurora", "ember", "lantern", "mirage", "oculus", "dapple", "eclipse"],
+    signal:   ["murmuration", "loom", "cipher", "tuning", "current", "veil", "echo", "glyph"],
+    orb:      ["breathe", "orbit", "glimmer", "vortex", "gather", "stir", "daybreak", "skein"],
+    presence: ["halo", "nucleus", "iris", "filament", "flare", "braid", "mote", "ripple"],
+    glass:    ["aura", "droplet", "nebula", "prism", "limn", "duet", "fathom", "arc", "opal",
+               "comet", "still", "flux", "tempest", "helix", "geode", "sol", "abyss", "chorus"]
+  };
+  var STATES = ["idle", "listening", "thinking", "responding", "success", "error"];
+  var KNOBS = {
+    eddy:["swirl","drift","grain","shear"], well:["pull","depthGlow","churn","offset"],
+    tide:["reach","lean","foam","period"], undertow:["contrast","slip","veil","bias"],
+    meander:["width","wander","bank","flow"], confluence:["approach","mingle","shimmer","angle"],
+    melt:["mass","viscosity","dripAbsorb","heat"], glaze:["sheet","slide","sheen","tilt"],
+    bloom:["spread","edgeTear","tail","asymmetry"], marbling:["folds","comb","contrast","drift"],
+    wick:["climb","fiber","pooling","dryEdge"], strata:["layers","settle","disturb","tilt"],
+    halation:["mass","corona","morph","offset"], pool:["tension","tremor","sheen","tilt"],
+    feather:["bleed","fiber","direction","dryness"], palimpsest:["layers","legibility","surfacing","age"],
+    caustic:["web","depthWater","swim","focus"], aurora:["fold","height","wander","thin"],
+    ember:["heat","shimmer","floor","updraft"], lantern:["fog","reach","drift","offset"],
+    mirage:["bands","bend","distance","haze"], oculus:["aperture","rim","beam","dust"],
+    dapple:["canopy","breeze","patch","depthLight"], eclipse:["occlude","corona","drift","softness"],
+    murmuration:["flock","turn","cohesion","sky"], loom:["threads","tension","sheen","angle"],
+    cipher:["reveal","structure","dwell","scatter"], tuning:["band","lock","hiss","drift"],
+    current:["pathways","pulseRate","glow","branch"], veil:["layers","parallax","legibility","drift"],
+    echo:["repeats","decay","offset","blur"], glyph:["marks","formation","dissolve","ink"],
+    breathe:["breath","depthFade","dotSize","material"], orbit:["bands","flow","dotSize","material"],
+    glimmer:["sparkle","spread","dotSize","material"], vortex:["swirl","pole","dotSize","material"],
+    gather:["pull","ring","dotSize","material"], stir:["jitter","settle","dotSize","material"],
+    daybreak:["sweep","softness","dotSize","material"], skein:["winding","trail","dotSize","material"],
+    halo:["tilt","thickness","waviness","shimmer"], nucleus:["coreSize","shell","circulate","swellRange"],
+    iris:["petals","openness","softness","twist"], filament:["length","knot","brightness","sway"],
+    flare:["discSize","licks","reach","flicker"], braid:["strands","twist","separation","glowBalance"],
+    mote:["wander","lean","size","tail"], ripple:["stillness","ringSpeed","decay","sheen"],
+    aura:["ribbons","swirl","spread","depth3d"], droplet:["wobble","tension","sheen","spread"],
+    nebula:["density","fold","glintRate","spread"], prism:["beams","split","drift","spread"],
+    limn:["rimWidth","travel","innerHint","spread"], duet:["separation","orbit","sizeRatio","spread"],
+    fathom:["layers","parallax","murk","spread"], arc:["arcLength","sway","corePin","spread"],
+    opal:["flashes","drift","softness","spread"], comet:["orbitTilt","trail","pointSize","spread"],
+    still:["glintRate","clarity","presence","spread"], flux:["stream","bend","height","spread"],
+    tempest:["storm","churn","flicker","spread"], helix:["turns","rise","strandGlow","spread"],
+    geode:["facets","glimmer","depthCrystal","spread"], sol:["coronaSize","prominence","simmer","spread"],
+    abyss:["creatures","rarity","drift","spread"], chorus:["voices","sync","breatheDepth","spread"]
+  };
+
+function $(id) { return document.getElementById(id); }
+  function isGlass(style) { return ROSTER.glass.indexOf(style) !== -1; }
+
+  var familySel = $("family"), styleSel = $("styleSel");
+  var backendSel = $("backend"), backendBadge = $("backendBadge");
+  var level = $("level"), activity = $("activity"), tiltX = $("tiltX"), tiltY = $("tiltY");
+  var ink = $("ink"), tone = $("tone"), tone2 = $("tone2"), backgroundColor = $("backgroundColor");
+  var fps = $("fps"), animated = $("animated");
+
+  Object.keys(ROSTER).forEach(function (f) {
+    var opt = document.createElement("option");
+    opt.value = f; opt.textContent = f;
+    familySel.appendChild(opt);
+  });
+  familySel.value = "glass";
+
+  function fillStyleOptions() {
+    styleSel.innerHTML = "";
+    ROSTER[familySel.value].forEach(function (s) {
+      var opt = document.createElement("option");
+      opt.value = s; opt.textContent = s;
+      styleSel.appendChild(opt);
+    });
+  }
+
+  var orb = null, stateName = "thinking", knobRanges = [];
+
+  function buildConfig() {
+    var style = styleSel.value;
+    var cfg = {
+      style: style,
+      backend: backendSel.value,
+      ink: ink.value,
+      tone: tone.value,
+      animated: animated.checked,
+      fps: parseInt(fps.value, 10) || 30,
+      state: stateName
+    };
+    if (isGlass(style)) cfg.tone2 = tone2.value;
+    return cfg;
+  }
+
+  function updateBackendBadge() {
+    if (!orb) { backendBadge.textContent = "no orb"; return; }
+    var ctxs = Murmur.webGLContextsInUse(), budget = Murmur.webGLContextBudget();
+    backendBadge.textContent = orb.backend + "  ·  " + ctxs + "/" + budget + " WebGL contexts";
+  }
+
+  function createOrb() {
+    if (orb) orb.destroy();
+    var bg = backgroundColor.value;
+    orb = new Murmur($("stage"), buildConfig(), { backgroundColor: bg === "#000000" ? undefined : bg });
+    syncSignals();
+    applyKnobs();
+    activateState(stateName);
+    updateBackendBadge();
+    window.orb = orb;
+  }
+
+  function syncSignals() {
+    orb.setSignals({ level: parseFloat(level.value), activity: parseFloat(activity.value) });
+    orb.setTilt(parseFloat(tiltX.value), parseFloat(tiltY.value), 0.3);
+  }
+
+  function activateState(s) {
+    stateName = s;
+    orb.setState(s);
+    Array.prototype.forEach.call(document.querySelectorAll("#stateBtns button"), function (b) {
+      b.style.borderColor = b.dataset.state === s ? "var(--acc)" : "";
+    });
+  }
+
+  function renderKnobs(style) {
+    var names = KNOBS[style] || ["c0", "c1", "c2", "c3"];
+    var box = $("knobs");
+    box.innerHTML = "";
+    knobRanges = [];
+    names.forEach(function (name, i) {
+      var d = document.createElement("div");
+      d.className = "knob";
+      var lbl = document.createElement("span");
+      lbl.className = "name"; lbl.textContent = name;
+      var r = document.createElement("input");
+      r.type = "range"; r.min = 0; r.max = 1; r.step = 0.01; r.value = 0.5;
+      var out = document.createElement("output");
+      out.textContent = "0.50";
+      r.addEventListener("input", function () {
+        out.textContent = Number(r.value).toFixed(2);
+        applyKnobs();
+      });
+      d.appendChild(lbl); d.appendChild(r); d.appendChild(out);
+      box.appendChild(d);
+      knobRanges.push(r);
+    });
+  }
+
+  function applyKnobs() {
+    if (!orb || !knobRanges.length) return;
+    var character = { c0: 0.5, c1: 0.5, c2: 0.5, c3: 0.5 };
+    knobRanges.forEach(function (r, i) { character["c" + i] = parseFloat(r.value); });
+    var partial = { states: {} };
+    partial.states[stateName] = { character: character };
+    orb.setConfig(partial);
+  }
+
+  function wireControl(sel, oninput) {
+    $(sel).addEventListener("input", oninput);
+  }
+
+  // state buttons
+  STATES.forEach(function (s) {
+    var b = document.createElement("button");
+    b.textContent = s;
+    b.dataset.state = s;
+    b.addEventListener("click", function () { activateState(s); applyKnobs(); });
+    $("stateBtns").appendChild(b);
+  });
+
+  // signals + tilt
+  wireControl("level", function () {
+    $("levelOut").textContent = Number(level.value).toFixed(2);
+    if (orb) orb.setSignals({ level: parseFloat(level.value) });
+  });
+  wireControl("activity", function () {
+    $("activityOut").textContent = Number(activity.value).toFixed(2);
+    if (orb) orb.setSignals({ activity: parseFloat(activity.value) });
+  });
+  wireControl("tiltX", function () {
+    $("tiltXOut").textContent = Number(tiltX.value).toFixed(2);
+    if (orb) orb.setTilt(parseFloat(tiltX.value), parseFloat(tiltY.value), 0.3);
+  });
+  wireControl("tiltY", function () {
+    $("tiltYOut").textContent = Number(tiltY.value).toFixed(2);
+    if (orb) orb.setTilt(parseFloat(tiltX.value), parseFloat(tiltY.value), 0.3);
+  });
+
+  // colors
+  wireControl("ink", function () { if (orb) orb.setConfig({ ink: ink.value }); });
+  wireControl("tone", function () { if (orb) orb.setConfig({ tone: tone.value }); });
+  wireControl("tone2", function () {
+    if (orb && isGlass(styleSel.value)) orb.setConfig({ tone2: tone2.value });
+  });
+
+  // fps + animated
+  wireControl("fps", function () { if (orb) orb.setConfig({ fps: parseInt(fps.value, 10) || 30 }); });
+  animated.addEventListener("change", function () {
+    if (orb) orb.setConfig({ animated: animated.checked, fps: parseInt(fps.value, 10) || 30 });
+  });
+
+  // family/style
+  familySel.addEventListener("change", function () {
+    fillStyleOptions();
+    styleSel.value = ROSTER[familySel.value][0];
+    onStyleChange();
+  });
+  styleSel.addEventListener("change", onStyleChange);
+  backendSel.addEventListener("change", createOrb);
+  function onStyleChange() {
+    renderKnobs(styleSel.value);
+    createOrb();
+  }
+
+  // actions
+  $("recreate").addEventListener("click", createOrb);
+  var cycleTimer = null, cycIdx = 3;
+  $("cycle").addEventListener("click", function () {
+    if (cycleTimer) { clearInterval(cycleTimer); cycleTimer = null; $("cycle").textContent = "Cycle states"; return; }
+    $("cycle").textContent = "Stop cycling";
+    cycleTimer = setInterval(function () {
+      cycIdx = (cycIdx + 1) % STATES.length;
+      stateName = STATES[cycIdx];
+      orb.setState(stateName);
+      orb.setSignals({ level: 0.3 + 0.5 * Math.abs(Math.sin(cycIdx * 1.7)), activity: 0.2 + 0.6 * Math.abs(Math.cos(cycIdx)) });
+      Array.prototype.forEach.call(document.querySelectorAll("#stateBtns button"), function (b) {
+        b.style.borderColor = b.dataset.state === stateName ? "var(--acc)" : "";
+      });
+    }, 1600);
+  });
+  $("still").addEventListener("click", function () {
+    if (orb) orb.renderStill(performance.now() / 1000);
+  });
+  $("mic").addEventListener("click", function () {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert("getUserMedia is not available (needs https or localhost).");
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+      var ctx = new (window.AudioContext || window.webkitAudioContext)();
+      var src = ctx.createMediaStreamSource(stream);
+      var analyser = ctx.createAnalyser();
+      analyser.fftSize = 512;
+      src.connect(analyser);
+      var data = new Uint8Array(analyser.frequencyBinCount);
+      var prev = 0;
+      (function tick() {
+        requestAnimationFrame(tick);
+        analyser.getByteTimeDomainData(data);
+        var sum = 0;
+        for (var i = 0; i < data.length; i++) { var v = data[i] / 128 - 1; sum += v * v; }
+        var rms = Math.sqrt(sum / data.length);
+        var lvl = Math.min(1, rms * 4);
+        var act = Math.min(1, Math.abs(lvl - prev) * 12);
+        prev = lvl;
+        orb.setSignals({ level: lvl, activity: act });
+        var attrOrb = $("attrOrb");
+        if (attrOrb) {
+          attrOrb.setAttribute("level", lvl.toFixed(2));
+          attrOrb.setAttribute("activity", act.toFixed(2));
+        }
+      })();
+    }).catch(function (err) { alert("Mic failed: " + err); });
+  });
+
+  // boot — the hero orb mounts first so it wins the oldest WebGL2 context
+  // slot before the static stage and the 66-orb roster consume the budget.
+  fillStyleOptions();
+  styleSel.value = "aura";
+  renderKnobs("aura");
+  createOrb();
+
+  // static / renderStill orb
+  var staticOrb = new Murmur($("static-stage"), { style: "opal", animated: false, tone2: "#9b5cff", fps: 30 });
+  var staticT = 0;
+  function staticRender() {
+    staticOrb.renderStill(staticT);
+    $("staticTime").textContent = "t = " + staticT.toFixed(2) + "s";
+  }
+  $("staticPrev").addEventListener("click", function () { staticT = Math.max(0, staticT - 5); staticRender(); });
+  $("staticNext").addEventListener("click", function () { staticT += 5; staticRender(); });
+  staticRender();
+
+  // custom element — attribute cycle
+  $("attrsCycle").addEventListener("click", function () {
+    var el = $("attrOrb");
+    var idx = STATES.indexOf(el.getAttribute("state") || "idle");
+    el.setAttribute("state", STATES[(idx + 1) % STATES.length]);
+    el.setAttribute("level", (0.2 + Math.random() * 0.6).toFixed(2));
+    el.setAttribute("activity", (0.1 + Math.random() * 0.8).toFixed(2));
+  });
+
+  // roster grid
+  Object.keys(ROSTER).forEach(function (f) {
+    var div = document.createElement("div");
+    div.className = "family";
+    var h3 = document.createElement("h3");
+    h3.textContent = f;
+    div.appendChild(h3);
+    var grid = document.createElement("div");
+    grid.className = "roster-grid";
+    ROSTER[f].forEach(function (s) {
+      var tile = document.createElement("div");
+      tile.className = "tile";
+      var wrap = document.createElement("div");
+      wrap.className = "orb";
+      var el = document.createElement("murmur-orb");
+      el.setAttribute("style-name", s);
+      wrap.appendChild(el);
+      tile.appendChild(wrap);
+      var name = document.createElement("div");
+      name.className = "name"; name.textContent = s;
+      tile.appendChild(name);
+      grid.appendChild(tile);
+    });
+    div.appendChild(grid);
+    $("roster").appendChild(div);
+  });
+
+  // poke a few roster orbs so the custom element reacts to attribute changes
+  setInterval(function () {
+    var els = $("roster").querySelectorAll("murmur-orb");
+    for (var i = 0; i < els.length; i += 9) {
+      var el = els[i];
+      el.setAttribute("state", STATES[(i + Math.floor(performance.now() / 1600)) % STATES.length]);
+      el.setAttribute("level", (0.15 + 0.6 * Math.random()).toFixed(2));
+      el.setAttribute("activity", (0.1 + 0.8 * Math.random()).toFixed(2));
+    }
+  }, 1600);
+
+  // footer
+  $("version").textContent = Murmur.version;
+})();
+</script>
+</body>
+</html>

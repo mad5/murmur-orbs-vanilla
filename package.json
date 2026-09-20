@@ -1,0 +1,20 @@
+{
+  "name": "murmur-vanilla-js",
+  "version": "0.1.0",
+  "description": "Murmur AI-presence orbs for the web. Vanilla JS, no runtime dependencies. WebGL2 with a Canvas2D CPU fallback.",
+  "type": "module",
+  "main": "src/murmur.js",
+  "exports": {
+    ".": "./src/murmur.js"
+  },
+  "files": [
+    "src",
+    "dist"
+  ],
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "gen:glsl": "node tools/metal2glsl.mjs && node tools/build.mjs",
+    "smoke": "node tools/smoke.mjs dist/murmur.js"
+  },
+  "license": "MIT"
+}

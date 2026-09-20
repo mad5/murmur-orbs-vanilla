@@ -1,0 +1,43 @@
+<!doctype html>
+<html><head><meta charset="utf-8"></head>
+<body>
+<script src="../dist/murmur.js"></script>
+<div id="box" style="width:100px;height:100px"></div>
+<pre id="report"></pre>
+<script>
+  const report = document.getElementById("report");
+  const errors = [];
+  const origError = console.error;
+  console.error = (...a) => { errors.push(a.join(" ")); };
+  (async () => {
+  try {
+    const box = document.getElementById("box");
+    const m = new Murmur(box, { style: "aura" });
+    const wasWebGL = !m.usingCanvas2D;
+    const oldCanvas = m.canvas;
+    const lose = (m.canvas.getContext("webgl2") || {}).getExtension?.("WEBGL_lose_context");
+    const hadLossExt = !!lose;
+    if (lose) {
+      lose.loseContext();
+      await new Promise((r) => setTimeout(r, 150));
+      if (!m.usingCanvas2D) {
+        m.canvas.dispatchEvent(new Event("webglcontextlost"));
+        await new Promise((r) => setTimeout(r, 50));
+      }
+    }
+    const fellBack = m.usingCanvas2D;
+    const canvasSwapped = oldCanvas !== m.canvas;
+    m.destroy();
+    report.textContent = [
+      "webgl started: " + wasWebGL,
+      "loss ext available: " + hadLossExt,
+      "fell back to canvas2d: " + fellBack,
+      "canvas swapped: " + canvasSwapped,
+      "console errors during test: " + errors.length,
+    ].join("\n");
+  } catch (e) {
+    report.textContent = "EXCEPTION: " + e.message + "\n" + (e.stack || "").split("\n").slice(0, 6).join("\n");
+  }
+  })();
+</script>
+</body></html>

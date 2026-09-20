@@ -1,0 +1,67 @@
+<!doctype html>
+<html><head><meta charset="utf-8"></head>
+<body>
+<script src="../dist/murmur.js"></script>
+<pre id="report"></pre>
+<script>
+  const report = document.getElementById("report");
+  const errors = [];
+  console.error = (...a) => { errors.push(a.join(" ")); };
+  const out = [];
+  const roster = [
+    "eddy","well","tide","undertow","meander","confluence","melt","glaze",
+    "bloom","marbling","wick","strata","halation","pool","feather","palimpsest",
+    "caustic","aurora","ember","lantern","mirage","oculus","dapple","eclipse",
+    "murmuration","loom","cipher","tuning","current","veil","echo","glyph",
+    "breathe","orbit","glimmer","vortex","gather","stir","daybreak","skein",
+    "halo","nucleus","iris","filament","flare","braid","mote","ripple",
+    "aura","droplet","nebula","prism","limn","duet","fathom","arc","opal",
+    "comet","still","flux","tempest","helix","geode","sol","abyss","chorus",
+  ];
+  let blank = 0;
+  let created = 0;
+  let switched = 0;
+  for (let round = 0; round < 3; round++) {
+    for (const style of roster) {
+      const el = document.createElement("div");
+      el.style.cssText = "width:48px;height:48px;position:absolute;left:-9999px;top:0";
+      document.body.appendChild(el);
+      let m;
+      try {
+        m = new Murmur(el, { style, animated: false });
+      } catch (e) {
+        errors.push("ctor " + style + ": " + e.message);
+        continue;
+      }
+      created++;
+      m.renderStill(1.0);
+      const gl = m.canvas.getContext("webgl2");
+      if (gl) {
+        const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
+        const px = new Uint8Array(w * h * 4);
+        gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+        let nonblack = 0;
+        for (let i = 0; i < px.length; i += 4) {
+          if (px[i] > 8 || px[i + 1] > 8 || px[i + 2] > 8) nonblack++;
+        }
+        if (nonblack === 0) blank++;
+      } else {
+        const r = m.canvas.getContext("2d");
+        if (!r) errors.push("no ctx for " + style);
+      }
+      // simulate a family/style switch: destroy + recreate immediately
+      m.destroy();
+      el.parentNode.removeChild(el);
+      switched++;
+    }
+  }
+  out.push("created: " + created, "switch cycles: " + switched, "blank reads: " + blank, "console errors: " + errors.length);
+  if (errors.length) {
+    const counts = {};
+    for (const e of errors) counts[e] = (counts[e] || 0) + 1;
+    out.push("--- error samples ---");
+    for (const [e, n] of Object.entries(counts).slice(0, 8)) out.push(n + "x  " + e.slice(0, 120));
+  }
+  report.textContent = out.join("\n");
+</script>
+</body></html>
