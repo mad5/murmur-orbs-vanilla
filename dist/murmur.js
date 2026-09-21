@@ -430,11 +430,16 @@ function webGLContextsInUse() {
 // backend: "auto" (best available, budget-aware),
 //          "webgl2"  (force WebGL2, ignore the budget),
 //          "canvas2d" (force the CPU fallback).
-function createRenderer(canvas, backend = "auto") {
+// opts.preserve: create the context with preserveDrawingBuffer so a rendered
+// still can be read back (toDataURL / drawImage) reliably, even after frames.
+function createRenderer(canvas, backend = "auto", { preserve = false } = {}) {
   if (backend === "canvas2d") return null;
   const forced = backend === "webgl2";
   if (!forced && activeContexts >= contextBudget) return null; // budget spent -> Canvas2D
-  const gl = canvas.getContext("webgl2", { antialias: false, alpha: false, depth: false, stencil: false });
+  const gl = canvas.getContext("webgl2", {
+    antialias: false, alpha: false, depth: false, stencil: false,
+    preserveDrawingBuffer: preserve,
+  });
   if (!gl) return null;
   if (!probeGL(gl)) {
     // A live context that still refuses our ES 3.00 shaders (driver/stub
@@ -1182,6 +1187,7 @@ function normalizeConfig(config) {
     fps: cfg.fps ?? 30,
     animated: cfg.animated !== false,
     stillTime: cfg.stillTime ?? 4,
+    preserveDrawingBuffer: cfg.preserveDrawingBuffer === true,
   };
 }
 
@@ -1223,7 +1229,9 @@ class Murmur {
     this.canvas = appendCanvas(container);
     this.pixelScale = window.devicePixelRatio || 1;
 
-    this.renderer = createRenderer(this.canvas, this.config.backend);
+    this.renderer = createRenderer(this.canvas, this.config.backend, {
+      preserve: this.config.preserveDrawingBuffer,
+    });
     this.usingCanvas2D = !this.renderer;
     if (this.renderer) {
       this.canvas.addEventListener("webglcontextlost", this._onContextLost);

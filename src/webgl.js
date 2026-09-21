@@ -33,11 +33,16 @@ export function webGLContextsInUse() {
 // backend: "auto" (best available, budget-aware),
 //          "webgl2"  (force WebGL2, ignore the budget),
 //          "canvas2d" (force the CPU fallback).
-export function createRenderer(canvas, backend = "auto") {
+// opts.preserve: create the context with preserveDrawingBuffer so a rendered
+// still can be read back (toDataURL / drawImage) reliably, even after frames.
+export function createRenderer(canvas, backend = "auto", { preserve = false } = {}) {
   if (backend === "canvas2d") return null;
   const forced = backend === "webgl2";
   if (!forced && activeContexts >= contextBudget) return null; // budget spent -> Canvas2D
-  const gl = canvas.getContext("webgl2", { antialias: false, alpha: false, depth: false, stencil: false });
+  const gl = canvas.getContext("webgl2", {
+    antialias: false, alpha: false, depth: false, stencil: false,
+    preserveDrawingBuffer: preserve,
+  });
   if (!gl) return null;
   if (!probeGL(gl)) {
     // A live context that still refuses our ES 3.00 shaders (driver/stub

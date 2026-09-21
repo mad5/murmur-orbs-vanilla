@@ -141,6 +141,7 @@ export function normalizeConfig(config) {
     fps: cfg.fps ?? 30,
     animated: cfg.animated !== false,
     stillTime: cfg.stillTime ?? 4,
+    preserveDrawingBuffer: cfg.preserveDrawingBuffer === true,
   };
 }
 
@@ -182,7 +183,9 @@ export class Murmur {
     this.canvas = appendCanvas(container);
     this.pixelScale = window.devicePixelRatio || 1;
 
-    this.renderer = createRenderer(this.canvas, this.config.backend);
+    this.renderer = createRenderer(this.canvas, this.config.backend, {
+      preserve: this.config.preserveDrawingBuffer,
+    });
     this.usingCanvas2D = !this.renderer;
     if (this.renderer) {
       this.canvas.addEventListener("webglcontextlost", this._onContextLost);
